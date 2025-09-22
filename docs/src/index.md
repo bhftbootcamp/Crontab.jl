@@ -1,11 +1,5 @@
 # Crontab.jl
 
-[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://bhftbootcamp.github.io/Crontab.jl/stable/)
-[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://bhftbootcamp.github.io/Crontab.jl/dev/)
-[![Build Status](https://github.com/bhftbootcamp/Crontab.jl/actions/workflows/Coverage.yml/badge.svg?branch=master)](https://github.com/bhftbootcamp/Crontab.jl/actions/workflows/Coverage.yml?query=branch%3Amaster)
-[![Coverage](https://codecov.io/gh/bhftbootcamp/Crontab.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/bhftbootcamp/Crontab.jl)
-[![Registry](https://img.shields.io/badge/registry-Green-green)](https://github.com/bhftbootcamp/Green)
-
 ⏰ **Crontab** - Lightweight cron parsing & scheduling for Julia. Crontab.jl provides a small, fast cron expression parser and runtime helpers to compute next/previous execution times, generate upcoming timestamps, and block until the next trigger.
 
 ## Installation
@@ -140,7 +134,3 @@ t2 = spawn_job("report",    Cron("*/2 * * * *"), 2, report_job)
 fetch(t1)
 fetch(t2)
 ```
-
-## Contributing
-
-Contributions to Crontab are welcome! If you encounter a bug, have a feature request, or would like to contribute code, please open an issue or a pull request on GitHub.

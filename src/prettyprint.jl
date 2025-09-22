@@ -96,7 +96,6 @@ function pretty(c::Cron)
     return "At " * join(parts, '\n')
 end
 
-
 prettyprint(c::Cron) = print(pretty(c))
 prettyprint(io::IO, c::Cron) = print(io, pretty(c))
 Base.show(io::IO, c::Cron) = prettyprint(io, c)

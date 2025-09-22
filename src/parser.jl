@@ -6,55 +6,65 @@
     return v
 end
 
-function _parsefield(::Type{P}, expr::AbstractString) where {P<:Period}
+@inline function _parsefield(::Type{P}, expr::AbstractString) where {P<:Period}
     s = strip(expr)
-    if s == "."
-        return TimeUnitIntervals{P}()
-    elseif s == "*"
-        return TimeUnitIntervals{P}(BitSet(lower(P):upper(P)),
+    s == "." && return TimeUnitIntervals{P}()
+    s == "*" && return TimeUnitIntervals{P}(BitSet(lower(P):upper(P)),
                                     AbstractInterval{P}[CoveringInterval{P}()])
-    elseif occursin(',', s)
-        acc = TimeUnitIntervals{P}()
-        for (i, raw) in enumerate(split(s, ','; keepempty=true))
-            tok = strip(raw)
-            isempty(tok) && throw(CrontabError("empty token at position $i in $(nameof(P)) field"))
-            union!(acc, _parsefield(P, tok))
+    acc = TimeUnitIntervals{P}()
+    pname = string(nameof(P))
+    idxstart(x) = x isa UnitRange ? first(x) : x
+    idxstop(x)  = x isa UnitRange ? last(x)  : x
+    for (i, raw) in enumerate(split(s, ','; keepempty=true))
+        tok = strip(raw)
+        isempty(tok) && throw(CrontabError("empty token at position $i in $(pname) field"))
+        tok == "." && continue
+        slash = findfirst('/', tok)
+        @views if slash !== nothing
+            sidx = idxstart(slash)
+            base = strip(tok[firstindex(tok):sidx-1])
+            step_str = strip(tok[nextind(tok, sidx):lastindex(tok)])
+            isempty(base) && throw(CrontabError("invalid $(pname) token '$tok': missing base before '/'"))
+            isempty(step_str) && throw(CrontabError("invalid $(pname) token '$tok': missing step after '/'"))
+            step = _parseint("$(pname) step", step_str)
+            step >= 1 || throw(CrontabError("invalid $(pname) step: must be ≥ 1, got $step"))
+            local l::Int, r::Int
+            if base == "*"
+                l, r = lower(P), upper(P)
+            else
+                dash = findfirst('-', base)
+                if dash !== nothing
+                    didx = idxstart(dash)
+                    a = strip(base[firstindex(base):didx-1])
+                    b = strip(base[nextind(base, didx):lastindex(base)])
+                    l = _parseint("$(pname) start", a)
+                    r = _parseint("$(pname) stop",  b)
+                else
+                    v = _parseint("$(pname) value", base)
+                    l, r = v, upper(P)
+                end
+            end
+            union!(acc, PeriodInterval{P}(l, r, step))
+            continue
         end
-        return acc
-    elseif occursin('/', s)
-        base, step_str = split(s, "/"; limit=2)
-        isempty(base)     && throw(CrontabError("invalid $(nameof(P)) token '$s': missing base before '/'"))
-        isempty(step_str) && throw(CrontabError("invalid $(nameof(P)) token '$s': missing step after '/'"))
-        step = _parseint("$(nameof(P)) step", step_str)
-        step >= 1 || throw(CrontabError("invalid $(nameof(P)) step: must be ≥ 1, got $step"))
-
-        local l::Int, r::Int
-        if base == "*"
-            l, r = lower(P), upper(P)
-        elseif occursin('-', base)
-            a, b = split(base, "-"; limit=2)
-            l = _parseint("$(nameof(P)) start", a)
-            r = _parseint("$(nameof(P)) stop",  b)
+        if tok == "*"
+            union!(acc, CoveringInterval{P}())
+            continue
+        end
+        dash = findfirst('-', tok)
+        @views if dash !== nothing
+            didx = idxstart(dash)
+            a = strip(tok[firstindex(tok):didx-1])
+            b = strip(tok[nextind(tok, didx):lastindex(tok)])
+            l = _parseint("$(pname) start", a)
+            r = _parseint("$(pname) stop",  b)
+            union!(acc, Interval{P}(l, r))
         else
-            v = _parseint("$(nameof(P)) value", base)
-            l, r = v, upper(P)
+            v = _parseint("$(pname) value", tok)
+            union!(acc, UnitInterval{P}(v))
         end
-        ensure_inbounds(P, l, "start"); ensure_inbounds(P, r, "stop")
-        l <= r || throw(CrontabError("invalid $(nameof(P)) interval: start ($l) must be ≤ stop ($r)"))
-        return TimeUnitIntervals{P}(BitSet(l:step:r),
-                                    AbstractInterval{P}[PeriodInterval{P}(l, r, step)])
-    elseif occursin('-', s)
-        a, b = split(s, "-"; limit=2)
-        l = _parseint("$(nameof(P)) start", a)
-        r = _parseint("$(nameof(P)) stop",  b)
-        ensure_inbounds(P, l, "start"); ensure_inbounds(P, r, "stop")
-        l <= r || throw(CrontabError("invalid $(nameof(P)) interval: start ($l) must be ≤ stop ($r)"))
-        return TimeUnitIntervals{P}(BitSet(l:r), AbstractInterval{P}[Interval{P}(l, r)])
-    else
-        v = _parseint("$(nameof(P)) value", s)
-        ensure_inbounds(P, v, "value")
-        return TimeUnitIntervals{P}(BitSet([v]), AbstractInterval{P}[UnitInterval{P}(v)])
     end
+    return acc
 end
 
 

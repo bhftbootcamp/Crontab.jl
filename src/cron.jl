@@ -1,41 +1,11 @@
 #__ cront_jl
 
-"""
-    bounds(::Type{Minute | Hour | Day | Month | Week}) -> (Int, Int)
-
-Return the inclusive lower and upper bounds for a given time unit.
-
-# Examples
-```julia-repl
-julia> using Crontab
-
-julia> Crontab.bounds(Minute)
-(0, 59)
-
-julia> Crontab.bounds(Day)
-(1, 31)
-```
-"""
 bounds(::Type{Minute}) = (0, 59)
 bounds(::Type{Hour})   = (0, 23)
 bounds(::Type{Day})    = (1, 31)
 bounds(::Type{Month})  = (1, 12)
 bounds(::Type{Week})   = (1, 7)
 
-"""
-    lower(::Type{P}) where P<:Period -> Int
-    upper(::Type{P}) where P<:Period -> Int
-
-Return the lower/upper inclusive bounds for the period `P`.
-
-# Examples
-```julia-repl
-julia> using Crontab
-
-julia> Crontab.lower(Month), Crontab.upper(Month)
-(1, 12)
-```
-"""
 lower(::Type{P}) where {P<:Period} = first(bounds(P))
 upper(::Type{P}) where {P<:Period} = last(bounds(P))
 
@@ -85,27 +55,73 @@ intervals(i::Interval)           = i.start:i.stop
 intervals(i::PeriodInterval)     = i.start:i.step:i.stop
 intervals(::CoveringInterval{P}) where {P<:Period} = lower(P):upper(P)
 
-struct TimeUnitIntervals{P<:Period}
+@inline _bitindex(::Type{P}, v::Int) where {P<:Period} = v - lower(P)
+@inline _bit(::Type{P}, v::Int) where {P<:Period} = UInt64(1) << _bitindex(P, v)
+
+@inline function _mask_for(::Type{P}, r::AbstractUnitRange{Int})::UInt64 where {P<:Period}
+    m = UInt64(0)
+    @inbounds for v in r
+        m |= _bit(P, v)
+    end
+    return m
+end
+@inline function _mask_for(::Type{P}, r::StepRange{Int,Int})::UInt64 where {P<:Period}
+    m = UInt64(0)
+    @inbounds for v in r
+        m |= _bit(P, v)
+    end
+    return m
+end
+
+mutable struct TimeUnitIntervals{P<:Period}
     set::BitSet
     intervals::Vector{AbstractInterval{P}}
-    TimeUnitIntervals{P}() where {P} = new(BitSet(), AbstractInterval{P}[])
+    mask::UInt64
+    TimeUnitIntervals{P}() where {P} = new(BitSet(), AbstractInterval{P}[], UInt64(0))
     TimeUnitIntervals{P}(set::BitSet, ivs::Vector{<:AbstractInterval{P}}) where {P} =
-        new(set, AbstractInterval{P}[ivs...])
+        new(set, AbstractInterval{P}[ivs...], begin
+            m = UInt64(0)
+            @inbounds for v in set
+                m |= _bit(P, Int(v))
+            end
+            m
+        end)
 end
 
 Base.isempty(t::TimeUnitIntervals) = isempty(t.set)
 
 function Base.union!(a::TimeUnitIntervals{P}, i::AbstractInterval{P}) where {P}
-    union!(a.set, BitSet(intervals(i)))
+    r = intervals(i)
+    union!(a.set, BitSet(r))
+    a.mask |= _mask_for(P, r)
     push!(a.intervals, i)
     return a
 end
+
 function Base.union!(a::TimeUnitIntervals{P}, b::TimeUnitIntervals{P}) where {P}
     union!(a.set, b.set)
+    a.mask |= b.mask
     append!(a.intervals, b.intervals)
     return a
 end
 
+"""
+    Cron
+
+Internal representation of a cron schedule. Construct a cron schedule from a five-field expression: `minute` `hour` `day` `month` `weekday`.
+Supports `*`, `/`, `-`, `,`, and `.` where `.` denotes an empty set.
+# Examples
+```julia-repl
+julia> Cron("*/15 * * * *")
+"At every 15th minute"
+
+julia> Cron("*", "*", "*", "*", "1")
+"At every minute\non Monday"
+
+julia> Cron(minute="0", hour="0", day="1")
+"At minute 0\npast hour 0\non day-of-month 1"
+```
+"""
 struct Cron
     minute::TimeUnitIntervals{Minute}
     hour::TimeUnitIntervals{Hour}
@@ -118,6 +134,7 @@ Base.string(i::Interval)        = string(i.start, "-", i.stop)
 Base.string(i::UnitInterval)    = string(i.value)
 Base.string(::CoveringInterval) = "*"
 Base.string(t::TimeUnitIntervals) = isempty(t) ? "." : join(string.(t.intervals), ",")
+
 function Base.string(i::PeriodInterval{P}) where {P<:Period}
     return if i.start == lower(P) && i.stop == upper(P)
         string("*/", i.step)
@@ -125,35 +142,10 @@ function Base.string(i::PeriodInterval{P}) where {P<:Period}
         string(i.start, "-", i.stop, "/", i.step)
     end
 end
+
 function Base.string(c::Cron)
     return join(string.((c.minute, c.hour, c.day, c.month, c.weekday)), " ")
 end
-
-@inline _fieldstr(x::AbstractString) = strip(x)
-@inline _fieldstr(::Colon) = "*"
-
-"""
-    Cron(::AbstractString)
-
-Construct a cron schedule from a five-field expression: minute hour day month weekday.
-Supports `*`, `/`, `-`, `,`, and `.` where `.` denotes an empty set. The `timezone`
-is stored on the schedule and used by blocking operations.
-
-Notes: If any field is empty (i.e. `.`), the schedule is unfilled and `next` will throw.
-
-# Examples
-```julia-repl
-julia> using Crontab
-
-julia> Cron("*/15 * * * *")
-At every 15th minute
-
-julia> Cron("0 14 * * 1-5")
-At minute 0
-past hour 14
-on every day-of-week from Monday through Friday
-```
-"""
 
 function Cron(s::AbstractString)
     parts = split(strip(s); keepempty=false)
@@ -181,19 +173,4 @@ function Cron(; minute::AbstractString="*",
     return Cron(minute, hour, day, month, weekday)
 end
 
-"""
-    Base.parse(::Type{Cron}, ::AbstractString)
-
-Parse a cron expression into a `Cron` schedule. Equivalent to calling `Cron(str)`.
-
-# Examples
-```julia-repl
-julia> using Crontab
-
-julia> Base.parse(Crontab.Cron, "0 14 * * 1-5")
-At minute 0
-past hour 14
-on every day-of-week from Monday through Friday
-```
-"""
 Base.parse(::Type{Cron}, expr::AbstractString) = Cron(expr)

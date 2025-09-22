@@ -18,6 +18,7 @@ makedocs(;
         "pages/api_reference.md",
     ],
     warnonly = [:doctest, :missing_docs],
+    repo = "github.com/bhftbootcamp/Crontab.jl"
 )
 
 deploydocs(;

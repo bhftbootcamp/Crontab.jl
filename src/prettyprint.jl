@@ -2,13 +2,13 @@
 
 const WEEKDAY_NAMES = ("Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday")
 
-@inline weekday_name(v::Int) = (1 <= v <= 7 ? WEEKDAY_NAMES[v] : string(v))
+weekday_name(v::Int) = (WEEKDAY_NAMES[v]) # fail, if v is not in (1..7)
 
-@inline label(::Type{Minute}) = "minute"
-@inline label(::Type{Hour})   = "hour"
-@inline label(::Type{Day})    = "day-of-month"
-@inline label(::Type{Month})  = "month"
-@inline label(::Type{Week})   = "day-of-week"
+label(::Type{Minute}) = "minute"
+label(::Type{Hour})   = "hour"
+label(::Type{Day})    = "day-of-month"
+label(::Type{Month})  = "month"
+label(::Type{Week})   = "day-of-week"
 
 @inline function ordinal_suffix(n::Int)
     t = n % 10; h = n % 100
@@ -16,47 +16,36 @@ const WEEKDAY_NAMES = ("Monday","Tuesday","Wednesday","Thursday","Friday","Satur
     (t == 2 && h != 12) ? "nd" :
     (t == 3 && h != 13) ? "rd" : "th"
 end
-@inline ordinal(n::Int) = string(n, ordinal_suffix(n))
 
-@inline step(::Type{Minute}, s::Int) = s == 1 ? "every minute"       : "every $(ordinal(s)) minute"
-@inline step(::Type{Hour},   s::Int) = s == 1 ? "every hour"         : "every $(ordinal(s)) hour"
-@inline step(::Type{Day},    s::Int) = s == 1 ? "every day-of-month" : "every $(ordinal(s)) day-of-month"
-@inline step(::Type{Week},   s::Int) = s == 1 ? "every day-of-week"  : "every $(ordinal(s)) day-of-week"
-@inline step(::Type{Month},  s::Int) = s == 1 ? "every month"        : "every $s months"
+ordinal(n::Int) = string(n, ordinal_suffix(n))
 
-@inline range_suffix(::Type{P}, l::Int, r::Int) where {P<:Period} =
+step(::Type{Minute}, s::Int) = s == 1 ? "every minute"       : "every $(ordinal(s)) minute"
+step(::Type{Hour},   s::Int) = s == 1 ? "every hour"         : "every $(ordinal(s)) hour"
+step(::Type{Day},    s::Int) = s == 1 ? "every day-of-month" : "every $(ordinal(s)) day-of-month"
+step(::Type{Week},   s::Int) = s == 1 ? "every day-of-week"  : "every $(ordinal(s)) day-of-week"
+step(::Type{Month},  s::Int) = s == 1 ? "every month"        : "every $s months"
+
+range_suffix(::Type{P}, l::Int, r::Int) where {P<:Period} =
     (l == lower(P) && r == upper(P)) ? "" : " from $l through $r"
 
-@inline range_suffix(::Type{Week}, l::Int, r::Int) =
+range_suffix(::Type{Week}, l::Int, r::Int) =
     (l == 1 && r == 7) ? "" : " from $(weekday_name(l)) through $(weekday_name(r))"
 
-@inline pretty(i::UnitInterval{Week}) = weekday_name(i.value)
-@inline pretty(i::UnitInterval{P}) where {P<:Period} =
+pretty(i::UnitInterval{Week}) = weekday_name(i.value)
+pretty(i::UnitInterval{P}) where {P<:Period} =
     string(label(P), " ", i.value)
 
-@inline pretty(i::Interval{P}) where {P<:Period} =
+pretty(i::Interval{P}) where {P<:Period} =
     "every " * label(P) * range_suffix(P, i.start, i.stop)
 
-@inline pretty(i::PeriodInterval{P}) where {P<:Period} =
+pretty(i::PeriodInterval{P}) where {P<:Period} =
     step(P, i.step) * range_suffix(P, i.start, i.stop)
 
-@inline pretty(::CoveringInterval{P}) where {P<:Period} =
+pretty(::CoveringInterval{P}) where {P<:Period} =
     "every " * label(P)
 
-"""
-    is_covering(t::TimeUnitIntervals{P}) where P<:Period -> Bool
 
-Return `true` if `t` contains all possible values for period `P` (i.e. covers `*`).
-
-# Examples
-```julia-repl
-julia> using Crontab
-
-julia> t = Crontab.TimeUnitIntervals{Minute}(); Crontab.is_covering(t)
-false
-```
-"""
-@inline is_covering(t::TimeUnitIntervals{P}) where {P<:Period} =
+is_covering(t::TimeUnitIntervals{P}) where {P<:Period} =
     length(t.set) == (upper(P) - lower(P) + 1)
 
 function pretty(t::TimeUnitIntervals{Minute})
@@ -78,21 +67,17 @@ function pretty(t::TimeUnitIntervals{P}) where {P<:Period}
 end
 
 """
-    pretty(c::Cron)::String
+    pretty(c::Cron) -> String
 
-Return a human-readable description of the schedule.
+Returns a human-readable representation of a `Cron` schedule. Used internally when printing a `Cron`.
 
-# Examples
+## Examples
 ```julia-repl
-julia> using Crontab
+julia> pretty(Cron("*/15 * * * *"))
+"At every 15th minute"
 
-julia> println(pretty(Cron("*/15 * * * *")))
-At every 15th minute
-
-julia> println(pretty(Cron("0 14 * * 1-5")))
-At minute 0
-past hour 14
-on every day-of-week from Monday through Friday
+julia> pretty(Cron("0 14 * * 1-5"))
+"At minute 0\\npast hour 14\\non every day-of-week from Monday through Friday"
 ```
 """
 function pretty(c::Cron)
@@ -111,20 +96,7 @@ function pretty(c::Cron)
     return "At " * join(parts, '\n')
 end
 
-"""
-    prettyprint(c::Cron)
-    prettyprint(io::IO, c::Cron)
 
-Print a human-readable description of the schedule.
-
-# Examples
-```julia-repl
-julia> using Crontab
-
-julia> prettyprint(Cron("*/15 * * * *"))
-"At every 15th minute"
-```
-"""
 prettyprint(c::Cron) = print(pretty(c))
 prettyprint(io::IO, c::Cron) = print(io, pretty(c))
 Base.show(io::IO, c::Cron) = prettyprint(io, c)

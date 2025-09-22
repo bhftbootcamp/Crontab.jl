@@ -6,57 +6,79 @@
 [![Coverage](https://codecov.io/gh/bhftbootcamp/Crontab.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/bhftbootcamp/Crontab.jl)
 [![Registry](https://img.shields.io/badge/registry-Green-green)](https://github.com/bhftbootcamp/Green)
 
-⏰ **Crontab** — lightweight cron-style scheduling for Julia. Write schedules with the familiar `* * * * *` syntax, compute the next run times, and drive your jobs easily.
+⏰ **Crontab** - Lightweight cron parsing & scheduling for Julia. Crontab.jl provides a small, fast cron expression parser and runtime helpers to compute next/previous execution times, generate upcoming timestamps, and block until the next trigger.
 
 ## Installation
 
-```julia
+If you haven't installed our [local registry](https://github.com/bhftbootcamp/Green) yet, do that first:
+```
+] registry add https://github.com/bhftbootcamp/Green.git
+```
+
+Then, to install Crontab, simply use the Julia package manager:
+```
 ] add Crontab
 ```
 
-## Quick start
+## Usage
 
-### Every 2 minutes
+Compute next match (inclusive of the minute boundary)
 ```julia
-using Crontab, Dates
+c = Cron("*/5 * * * *")
+next_time = next(c, DateTime("2025-01-01T12:03:00")) # 2025-01-01T12:05:00
+```
 
-cron = Cron("*/2 * * * *")  # every 2 minutes
+Previous match (inclusive of the minute boundary)
+```julia
+c = Cron("*/5 * * * *")
+prev_time = prev(c, DateTime("2025-01-01T12:03:00")) # 2025-01-01T12:00:00
+```
 
-while true
-    wait(cron)                      # blocks until next tick
-    println("Tick at ", now(UTC))   # do your work here
+Compute next match offset-style (not chrono-style)
+```julia
+c = Cron("*/5 * * * *")
+next_offset_time = next_offset(c, DateTime("2025-01-01T12:03:00")) # 2025-01-01T12:08:00
+```
+
+Generate 4 upcoming triggers strictly after a start time
+```julia
+c = Cron("*/5 * * * *")
+ts = timesteps(c, DateTime("2025-01-01T12:03:00"), 4) # 12:05, 12:10, 12:15, 12:20
+```
+
+Create infinite offset-based iterator from starting point
+```julia
+c = Cron("*/5 * * * *")
+start = DateTime("2025-01-01T12:07:00")
+xs = collect(take(gen_times(c, start), 4))
+# [
+#         DateTime("2025-01-01T12:12:00"),
+#         DateTime("2025-01-01T12:17:00"),
+#         DateTime("2025-01-01T12:22:00"),
+#         DateTime("2025-01-01T12:27:00"),
+# ]
+```
+
+Block until the next trigger (uses system clock)
+```julia
+c = Cron("*/5 * * * *")
+@async begin
+    println("Waiting…", now(UTC))
+    wait(c; tz=UTC)
+    println("Triggered at", now(UTC))
 end
-# prints e.g.: Tick at DateTime("2025-01-01T12:00:00")
 ```
 
-### Next N run times
+Get next leap year from date
 ```julia
-using Crontab, Dates
-
-cron = Cron("*/15", "*", "*", "*", "*")
-
-julia> timesteps(cron, DateTime("2025-01-01T12:03:00"), 5)
-5-element Vector{DateTime}:
- 2025-01-01T12:15:00
- 2025-01-01T12:30:00
- 2025-01-01T12:45:00
- 2025-01-01T13:00:00
- 2025-01-01T13:15:00
+c_leap = Cron("0 0 29 2 *")
+next(c_leap, DateTime("2024-03-01T00:00:00")) # DateTime("2028-02-29T00:00:00")
 ```
 
+Business hours on weekdays (every 10 minutes)
 ```julia
-julia> pretty(Cron("*/15 14 * * *"))
-At every 15th minute
-past hour 14
-```
-
-## Real‑world recipes
-
-### Business hours on weekdays (every 10 minutes)
-```julia
-using Crontab, Dates
-
 cron = Cron(; minute="*/10", hour="9-17", weekday="1-5")  # 09:00–17:59, Mon–Fri
+
 while true
     wait(cron)
     @async begin
@@ -65,54 +87,60 @@ while true
 end
 ```
 
-### Twice a month: 1st and 15th at 06:30 (Apr/Oct)
+Twice a month: 1st and 15th at 06:30 (Apr/Oct)
 ```julia
 cron = Cron("30 6 1,15 4,10 *")  # Apr/Oct 1st and 15th at 06:30
 ```
 
-### Run an external Julia script daily at 09:00 UTC
-```julia
-using Crontab
-
-cron = Cron("0", "9", "*", "*", "*")  # every day at 09:00
-
-while true
-    wait(cron)
-    run(`$(Base.julia_cmd()) /absolute/path/to/trade_summary.jl --symbol=AAPL`)
-end
-```
-
-### Get the next time from an arbitrary point
+Get the next time from an arbitrary point
 ```julia
 using Crontab, Dates
+
 c = Cron("*/5 * * * *")
+
 next(c, DateTime("2025-01-01T12:03:00"))  # => 2025-01-01T12:05:00
 ```
 
-## Cron syntax
+Example of running tasks asynchronously on cron schedules
+```julia
+using Dates
+using Crontab
+using CryptoExchangeAPIs.Binance
 
-Five fields separated by spaces:
+function spawn_job(name::AbstractString, cron::Cron, times::Int, job::Function; run_now::Bool=true)
+    return @async begin
+        if run_now
+            job()
+        end
+        for _ in 1:times
+            wait(cron; tz=UTC)
+            job()
+        end
+        println("$name done")
+        flush(stdout)
+    end
+end
 
-1. `minute` (0–59)
-2. `hour` (0–23)
-3. `day-of-month` (1–31)
-4. `month` (1–12)
-5. `day-of-week` (1–7, 1=Monday)
+function heartbeat_job()
+    println("heartbeat at $(now(UTC))")
+    flush(stdout)
+end
 
-Supported tokens:
+function report_job()
+    res = Binance.Spot.Ticker.ticker(; symbol = "ADAUSDT")
+    println("ADA/USDT price: ", res.result.lastPrice, " at $(now(UTC))")
+    flush(stdout)
+end
 
-- `*` — all values
-- `a-b` — inclusive range
-- `*/k` or `a-b/k` — step
-- `a,b,c` — list
-- `.` — empty (parses, but schedule cannot be executed)
+# Start two concurrent cron-driven tasks
+t1 = spawn_job("heartbeat", Cron("*/1 * * * *"), 3, heartbeat_job)
+t2 = spawn_job("report",    Cron("*/2 * * * *"), 2, report_job)
 
-`day-of-month` is combined with `day-of-week` using OR semantics (unless one of them is `*`).
+# Wait for both to finish
+fetch(t1)
+fetch(t2)
+```
 
-## API overview
+## Contributing
 
-- `Cron(str)` — parse a string into a schedule
-- `next(cron, dt)` — the next run time (inclusive)
-- `timesteps(cron, start, n)` — the next `n` run times after `start`
-- `wait(cron)` — block until the next run time
-- `pretty(cron)` — human-readable description; `show(cron)` prints it
+Contributions to Crontab are welcome! If you encounter a bug, have a feature request, or would like to contribute code, please open an issue or a pull request on GitHub.

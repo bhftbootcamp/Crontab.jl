@@ -3,11 +3,7 @@ using Dates
 using Crontab
 using Aqua
 
-# @testset "Aqua" begin
-#     Aqua.test_all(Crontab; deps_compat = false)
-# end
-
-# Parsing — valid
+# Parsing - valid
 @testset "Parsing (valid)" begin
     @test Cron("* * * * *") isa Cron
     @test Cron("*/5 * * * *") isa Cron
@@ -23,7 +19,7 @@ using Aqua
     @test Base.parse(Crontab.Cron, "*/5 1-2 10-11 2,4 1-5") isa Cron
 end
 
-# Parsing — invalid
+# Parsing - invalid
 @testset "Parsing (invalid)" begin
     @test_throws CrontabError Cron("61 * * * *")      # minute out of range
     @test_throws CrontabError Cron("*/0 * * * *")     # zero step
@@ -75,7 +71,7 @@ end
 end
 
 # next(): basic minute stepping
-@testset "next() — basic minutes" begin
+@testset "next() - basic minutes" begin
     cron = Cron("*/5 * * * *")
     @test next(cron, DateTime("2025-01-01T12:03:00"))  == DateTime("2025-01-01T12:05:00")
     @test next(cron, DateTime("2025-01-01T12:05:00"))  == DateTime("2025-01-01T12:05:00")  # on boundary
@@ -88,7 +84,7 @@ end
 end
 
 # next(): hour/day/month filters
-@testset "next() — hour/day/month filters" begin
+@testset "next() - hour/day/month filters" begin
     # Only at 14:00 any day
     c_14 = Cron("0 14 * * *")
     @test next(c_14, DateTime("2025-01-01T13:59:00")) == DateTime("2025-01-01T14:00:00")
@@ -102,7 +98,7 @@ end
 end
 
 # DOM vs DOW (OR semantics) + covering rules
-@testset "next() — day-of-month vs day-of-week" begin
+@testset "next() - day-of-month vs day-of-week" begin
     # 13th or Tuesday, at midnight
     c = Cron("0 0 13 * 2")
     @test next(c, DateTime("2025-03-10T10:00:00")) == DateTime("2025-03-11T00:00:00") # Mon -> Tue
@@ -120,7 +116,7 @@ end
 end
 
 # next(): multi-field combos
-@testset "next() — multi-field combos" begin
+@testset "next() - multi-field combos" begin
     # Every 10th minute during 9–17h on weekdays
     c = Cron("*/10 9-17 * * 1-5")
     @test next(c, DateTime("2025-03-07T09:03:00"))   == DateTime("2025-03-07T09:10:00")  # Fri morning
@@ -147,11 +143,11 @@ end
     ]
     @test issorted(ts)
 
-    # start exactly on boundary → next tick
+    # start exactly on boundary -> next tick
     c2 = Cron("*/5 * * * *")
     @test timesteps(c2, DateTime("2025-01-01T12:10:00"), 1) == [DateTime("2025-01-01T12:15:00")]
 
-    # n = 0 → empty
+    # n = 0 -> empty
     @test timesteps(c2, DateTime("2025-01-01T12:10:00"), 0) == DateTime[]
 end
 
@@ -168,7 +164,7 @@ end
     @test next(c_leap, DateTime("2024-03-01T00:00:00"))  == DateTime("2028-02-29T00:00:00")  # next leap year
 end
 
-# Invalid schedule usage (empty unions) — next() should throw
+# Invalid schedule usage (empty unions) - next() should throw
 @testset "Invalid schedule usage" begin
     c = Cron(". * * * *")  # invalid to run (minutes empty)
     @test_throws CrontabError next(c, now())
@@ -224,3 +220,46 @@ end
     c_tp = Cron("0", "14,18", "*", "*", "1-5")
     @test next(c_tp, DateTime("2025-01-01T17:50:00")) == DateTime("2025-01-01T18:00:00")
 end
+
+
+@testset "prev() - basic minutes" begin
+    c = Cron("*/5 * * * *")
+    @test prev(c, DateTime("2025-01-01T12:03:00")) == DateTime("2025-01-01T12:00:00")
+    @test prev(c, DateTime("2025-01-01T12:05:00")) == DateTime("2025-01-01T12:05:00")  # boundary
+end
+
+@testset "prev() - hour/day/month filters" begin
+    # Only at 14:00 any day
+    c_14 = Cron("0 14 * * *")
+    @test prev(c_14, DateTime("2025-01-02T15:00:00")) == DateTime("2025-01-02T14:00:00")
+    @test prev(c_14, DateTime("2025-01-01T13:00:00")) == DateTime("2024-12-31T14:00:00")
+
+    # Every day in March at 00:00
+    c_march = Cron("0 0 * 3 *")
+    @test prev(c_march, DateTime("2025-04-01T00:00:00")) == DateTime("2025-03-31T00:00:00")
+end
+
+@testset "prev() - day-of-month vs day-of-week (OR semantics)" begin
+    # 13th OR Tuesday, at midnight
+    c = Cron("0 0 13 * 2")
+    @test prev(c, DateTime("2025-03-12T00:00:00")) == DateTime("2025-03-11T00:00:00")  # Wed -> Tue
+    @test prev(c, DateTime("2025-03-14T00:00:00")) == DateTime("2025-03-13T00:00:00")  # Fri -> 13th
+    @test prev(c, DateTime("2025-03-13T00:00:00")) == DateTime("2025-03-13T00:00:00")  # boundary
+end
+
+@testset "prev() - boundaries & leap years" begin
+    # Long-month 31st rule; stepping back over February
+    cron = Cron("*/30 23 31 1,3,5,7,8,10,12 *")
+    @test prev(cron, DateTime("2025-03-01T00:00:00")) == DateTime("2025-01-31T23:30:00")
+
+    # Leap day
+    c_leap = Cron("0 0 29 2 *")
+    @test prev(c_leap, DateTime("2024-03-01T00:00:00")) == DateTime("2024-02-29T00:00:00")
+    @test prev(c_leap, DateTime("2023-03-01T00:00:00")) == DateTime("2020-02-29T00:00:00")
+end
+
+@testset "prev() - invalid schedule usage" begin
+    c = Cron(". * * * *")  # empty minutes: parse OK, runtime invalid
+    @test_throws CrontabError prev(c, now())
+end
+

@@ -444,7 +444,6 @@ julia> timesteps(Cron("*/5 * * * *"), Date(2025,01,01), 2)
 2-element Vector{DateTime}:
  2025-01-01T00:05:00
  2025-01-01T00:10:00
- 
 ```
 """
 function timesteps(c::Cron, start::DateTime, n::Integer)

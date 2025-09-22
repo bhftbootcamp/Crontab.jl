@@ -11,10 +11,10 @@ export Cron,
 using Dates
 using PrecompileTools
 
-
 struct CrontabError <: Exception
     message::String
 end
+
 Base.showerror(io::IO, e::CrontabError) = print(io, "CrontabError: ", e.message)
 
 include("cron.jl")

@@ -18,7 +18,7 @@ Then, to install Crontab, simply use the Julia package manager:
 
 Compute next match (inclusive of the minute boundary)
 ```julia
-using Crontab
+using Crontab, Dates
 cron = Cron("*/5 * * * *")
 next_time = next(cron, DateTime("2025-01-01T12:03:00")) # 2025-01-01T12:05:00
 ```

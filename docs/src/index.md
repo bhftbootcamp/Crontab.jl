@@ -18,33 +18,34 @@ Then, to install Crontab, simply use the Julia package manager:
 
 Compute next match (inclusive of the minute boundary)
 ```julia
-c = Cron("*/5 * * * *")
-next_time = next(c, DateTime("2025-01-01T12:03:00")) # 2025-01-01T12:05:00
+using Crontab
+cron = Cron("*/5 * * * *")
+next_time = next(cron, DateTime("2025-01-01T12:03:00")) # 2025-01-01T12:05:00
 ```
 
 Previous match (inclusive of the minute boundary)
 ```julia
-c = Cron("*/5 * * * *")
-prev_time = prev(c, DateTime("2025-01-01T12:03:00")) # 2025-01-01T12:00:00
+cron = Cron("*/5 * * * *")
+prev_time = prev(cron, DateTime("2025-01-01T12:03:00")) # 2025-01-01T12:00:00
 ```
 
 Compute next match offset-style (not chrono-style)
 ```julia
-c = Cron("*/5 * * * *")
-next_offset_time = next_offset(c, DateTime("2025-01-01T12:03:00")) # 2025-01-01T12:08:00
+cron = Cron("*/5 * * * *")
+next_offset_time = next_offset(cron, DateTime("2025-01-01T12:03:00")) # 2025-01-01T12:08:00
 ```
 
 Generate 4 upcoming triggers strictly after a start time
 ```julia
-c = Cron("*/5 * * * *")
-ts = timesteps(c, DateTime("2025-01-01T12:03:00"), 4) # 12:05, 12:10, 12:15, 12:20
+cron = Cron("*/5 * * * *")
+ts = timesteps(cron, DateTime("2025-01-01T12:03:00"), 4) # 12:05, 12:10, 12:15, 12:20
 ```
 
 Create infinite offset-based iterator from starting point
 ```julia
-c = Cron("*/5 * * * *")
+cron = Cron("*/5 * * * *")
 start = DateTime("2025-01-01T12:07:00")
-xs = collect(take(gen_times(c, start), 4))
+xs = collect(take(gen_times(cron, start), 4))
 # [
 #         DateTime("2025-01-01T12:12:00"),
 #         DateTime("2025-01-01T12:17:00"),
@@ -53,13 +54,23 @@ xs = collect(take(gen_times(c, start), 4))
 # ]
 ```
 
-Block until the next trigger (uses system clock)
+Block until the next trigger (uses system clock) ie trigger once
 ```julia
-c = Cron("*/5 * * * *")
+cron = Cron("*/5 * * * *")
 @async begin
-    println("Waiting…", now(UTC))
+    println("Waiting… ", now(UTC))
+    wait(cron; tz=UTC)
+    println("Triggered at ", now(UTC))
+end
+```
+
+Trigger every minutes
+```julia
+cron = Cron("*/1 * * * *")
+@async begin
+    println("Waiting… ", now(UTC))
     wait(c; tz=UTC)
-    println("Triggered at", now(UTC))
+    println("Triggered at ", now(UTC))
 end
 ```
 
@@ -76,7 +87,7 @@ cron = Cron(; minute="*/10", hour="9-17", weekday="1-5")  # 09:00–17:59, Mon�
 while true
     wait(cron)
     @async begin
-        # do useful work
+        println("Triggered a useful work at ", now(UTC))
     end
 end
 ```

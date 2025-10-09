@@ -56,7 +56,7 @@ Trigger every minutes
 cron = Cron("*/1 * * * *")
 @async begin
     println("Waiting… ", now(UTC))
-    wait(c; tz=UTC)
+    wait(cron; tz=UTC)
     println("Triggered at ", now(UTC))
 end
 ```

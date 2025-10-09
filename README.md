@@ -1,5 +1,6 @@
 # Crontab.jl
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/bhftbootcamp/Crontab.jl)
 [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://bhftbootcamp.github.io/Crontab.jl/stable/)
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://bhftbootcamp.github.io/Crontab.jl/dev/)
 [![Build Status](https://github.com/bhftbootcamp/Crontab.jl/actions/workflows/Coverage.yml/badge.svg?branch=master)](https://github.com/bhftbootcamp/Crontab.jl/actions/workflows/Coverage.yml?query=branch%3Amaster)

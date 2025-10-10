@@ -36,29 +36,10 @@ cron = Cron("*/5 * * * *")
 prev_time = prev(cron, DateTime("2025-01-01T12:03:00")) # 2025-01-01T12:00:00
 ```
 
-Compute next match offset-style (not chrono-style)
-```julia
-cron = Cron("*/5 * * * *")
-next_offset_time = next_offset(cron, DateTime("2025-01-01T12:03:00")) # 2025-01-01T12:08:00
-```
-
 Generate 4 upcoming triggers strictly after a start time
 ```julia
 cron = Cron("*/5 * * * *")
 ts = timesteps(cron, DateTime("2025-01-01T12:03:00"), 4) # 12:05, 12:10, 12:15, 12:20
-```
-
-Create infinite offset-based iterator from starting point
-```julia
-cron = Cron("*/5 * * * *")
-start = DateTime("2025-01-01T12:07:00")
-xs = collect(take(gen_times(cron, start), 4))
-# [
-#         DateTime("2025-01-01T12:12:00"),
-#         DateTime("2025-01-01T12:17:00"),
-#         DateTime("2025-01-01T12:22:00"),
-#         DateTime("2025-01-01T12:27:00"),
-# ]
 ```
 
 Block until the next trigger (uses system clock) ie trigger once
@@ -76,7 +57,7 @@ Trigger every minutes
 cron = Cron("*/1 * * * *")
 @async begin
     println("Waiting… ", now(UTC))
-    wait(c; tz=UTC)
+    wait(cron; tz=UTC)
     println("Triggered at ", now(UTC))
 end
 ```
@@ -102,15 +83,6 @@ end
 Twice a month: 1st and 15th at 06:30 (Apr/Oct)
 ```julia
 cron = Cron("30 6 1,15 4,10 *")  # Apr/Oct 1st and 15th at 06:30
-```
-
-Get the next time from an arbitrary point
-```julia
-using Crontab, Dates
-
-c = Cron("*/5 * * * *")
-
-next(c, DateTime("2025-01-01T12:03:00"))  # => 2025-01-01T12:05:00
 ```
 
 Example of running tasks asynchronously on cron schedules

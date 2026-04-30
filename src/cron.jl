@@ -1,4 +1,4 @@
-#__ cront_jl
+#__ crontab
 
 bounds(::Type{Minute}) = (0, 59)
 bounds(::Type{Hour})   = (0, 23)
@@ -148,15 +148,17 @@ function Base.string(c::Cron)
 end
 
 function Cron(s::AbstractString)
-    parts = split(strip(s); keepempty=false)
+    parts = split(strip(s); keepempty = false)
     length(parts) == 5 || throw(CrontabError("invalid cron string (expect 5 fields)"))
     return Cron(parts[1], parts[2], parts[3], parts[4], parts[5])
 end
-function Cron(minute::AbstractString,
-              hour::AbstractString,
-              day::AbstractString,
-              month::AbstractString,
-              weekday::AbstractString)
+function Cron(
+    minute::AbstractString,
+    hour::AbstractString,
+    day::AbstractString,
+    month::AbstractString,
+    weekday::AbstractString,
+)
     return Cron(
         _parsefield(Minute, minute),
         _parsefield(Hour, hour),
@@ -165,11 +167,13 @@ function Cron(minute::AbstractString,
         _parsefield(Week, weekday),
     )
 end
-function Cron(; minute::AbstractString="*",
-               hour::AbstractString="*",
-               day::AbstractString="*",
-               month::AbstractString="*",
-               weekday::AbstractString="*")
+function Cron(;
+    minute::AbstractString = "*",
+    hour::AbstractString = "*",
+    day::AbstractString = "*",
+    month::AbstractString = "*",
+    weekday::AbstractString = "*",
+)
     return Cron(minute, hour, day, month, weekday)
 end
 

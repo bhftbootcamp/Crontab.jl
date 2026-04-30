@@ -1,4 +1,4 @@
-#__ prettyprint_jl
+#__ prettyprint
 
 const WEEKDAY_NAMES = ("Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday")
 

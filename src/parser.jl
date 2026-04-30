@@ -1,4 +1,4 @@
-#__ parser_jl
+#__ parser
 
 @inline function _parseint(what::AbstractString, x::AbstractString)::Int
     v = tryparse(Int, strip(x))
@@ -9,13 +9,15 @@ end
 @inline function _parsefield(::Type{P}, expr::AbstractString) where {P<:Period}
     s = strip(expr)
     s == "." && return TimeUnitIntervals{P}()
-    s == "*" && return TimeUnitIntervals{P}(BitSet(lower(P):upper(P)),
-                                    AbstractInterval{P}[CoveringInterval{P}()])
+    s == "*" && return TimeUnitIntervals{P}(
+        BitSet(lower(P):upper(P)),
+        AbstractInterval{P}[CoveringInterval{P}()],
+    )
     acc = TimeUnitIntervals{P}()
     pname = string(nameof(P))
     idxstart(x) = x isa UnitRange ? first(x) : x
     idxstop(x)  = x isa UnitRange ? last(x)  : x
-    for (i, raw) in enumerate(split(s, ','; keepempty=true))
+    for (i, raw) in enumerate(split(s, ','; keepempty = true))
         tok = strip(raw)
         isempty(tok) && throw(CrontabError("empty token at position $i in $(pname) field"))
         tok == "." && continue

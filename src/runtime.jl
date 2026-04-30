@@ -1,4 +1,4 @@
-#__runtime_jl
+#__ runtime
 
 @inline _cron_is_valid(c::Cron) =
     !(isempty(c.minute) || isempty(c.hour) || isempty(c.day) ||
@@ -418,7 +418,7 @@ function prev(c::Cron, start::TimeType)
     return prev(c, DateTime(start))
 end
 
-function Base.wait(c::Cron; tz=UTC)
+function Base.wait(c::Cron; tz = UTC)
     now_dt = now(tz)
     fire_dt = next(c, now_dt)
     sleep(fire_dt - DateTime(now_dt))

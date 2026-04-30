@@ -1,7 +1,7 @@
 name = "Crontab"
 uuid = "ef2ba9de-7028-49d5-af83-156ed29fbb62"
 keywords = ["cron", "crontab"]
-version = "0.1.0"
+version = "0.1.1"
 
 [deps]
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
